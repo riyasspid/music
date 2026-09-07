@@ -12,7 +12,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       ConcatenatingAudioSource(children: []);
 
   MusicAudioHandler() {
-    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+    _player.playbackEventStream.listen((event) {
+      playbackState.add(_transformEvent(event));
+    });
     _listenToCurrentIndex();
     _player.setAudioSource(_playlist, preload: false);
   }
@@ -78,6 +80,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     final enabled = shuffleMode == AudioServiceShuffleMode.all;
+    if (enabled) {
+      await _player.shuffle();
+    }
     await _player.setShuffleModeEnabled(enabled);
     playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
   }

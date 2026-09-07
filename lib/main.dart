@@ -32,7 +32,7 @@ Future<void> main() async {
   // Initialize AudioService + handler (background audio)
   final audioHandler = await AudioService.init(
     builder: () => MusicAudioHandler(),
-    config: AudioServiceConfig(
+    config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.music.app.channel',
       androidNotificationChannelName: 'Music',
       androidStopForegroundOnPause: true,

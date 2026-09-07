@@ -11,13 +11,19 @@ import 'empty_state.dart';
 class QueueSheet extends StatelessWidget {
   const QueueSheet({super.key});
 
+  static bool _isOpen = false;
+
   static void show(BuildContext context) {
+    if (_isOpen) return;
+    _isOpen = true;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => const QueueSheet(),
-    );
+    ).whenComplete(() {
+      _isOpen = false;
+    });
   }
 
   @override

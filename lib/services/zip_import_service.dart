@@ -13,20 +13,24 @@ import '../data/repositories/song_repository.dart';
 
 class ZipImportService {
   final SongRepository _repo;
+  bool _isImporting = false;
 
   ZipImportService(this._repo);
 
   /// Prompts the user to pick a ZIP, extracts it, merges songs into library.
   /// Returns (imported, skipped) count tuple.
   Future<(int imported, int skipped)> importFromZip() async {
-    // 1. Pick ZIP file
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-    );
-    if (result == null || result.files.isEmpty) return (0, 0);
-    final zipPath = result.files.first.path;
-    if (zipPath == null) return (0, 0);
+    if (_isImporting) return (0, 0);
+    _isImporting = true;
+    try {
+      // 1. Pick ZIP file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+      );
+      if (result == null || result.files.isEmpty) return (0, 0);
+      final zipPath = result.files.first.path;
+      if (zipPath == null) return (0, 0);
 
     // 2. Extract to temp dir
     final appDir = await getApplicationDocumentsDirectory();
@@ -112,8 +116,11 @@ class ZipImportService {
       imported++;
     }
 
-    // 9. Clean up temp
-    extractDir.deleteSync(recursive: true);
-    return (imported, skipped);
+      // 9. Clean up temp
+      extractDir.deleteSync(recursive: true);
+      return (imported, skipped);
+    } finally {
+      _isImporting = false;
+    }
   }
 }

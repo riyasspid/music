@@ -8,6 +8,7 @@ import '../../core/theme/neumorphic_widget.dart';
 import '../../services/export_service.dart';
 import '../../services/sleep_timer_service.dart';
 import '../../services/zip_import_service.dart';
+import '../../core/utils.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -46,23 +47,17 @@ class SettingsScreen extends StatelessWidget {
               title: 'Export ZIP',
               subtitle: 'Download all songs + metadata as a ZIP backup',
               onTap: () async {
-                Get.snackbar('Exporting…', 'Building your ZIP',
-                    backgroundColor: neuBase,
-                    snackPosition: SnackPosition.BOTTOM);
+                AppSnackbar.show('Exporting…', 'Building your ZIP');
                 final path = await exportSvc.exportAll();
                 if (path != null && context.mounted) {
-                  Get.snackbar(
+                  AppSnackbar.show(
                     '✅ Export Complete',
                     'Saved to Downloads: ${path.split('/').last}',
-                    backgroundColor: neuBase,
-                    snackPosition: SnackPosition.BOTTOM,
                     duration: const Duration(seconds: 5),
                   );
-                } else {
-                  Get.snackbar('Export Failed',
-                      'No songs to export or an error occurred',
-                      backgroundColor: neuBase,
-                      snackPosition: SnackPosition.BOTTOM);
+                } else if (context.mounted) {
+                  AppSnackbar.show('Export Failed',
+                      'No songs to export or an error occurred');
                 }
               },
             ),
@@ -75,16 +70,12 @@ class SettingsScreen extends StatelessWidget {
               title: 'Import ZIP',
               subtitle: 'Restore songs from a Music ZIP backup',
               onTap: () async {
-                Get.snackbar('Importing…', 'Please wait',
-                    backgroundColor: neuBase,
-                    snackPosition: SnackPosition.BOTTOM);
+                AppSnackbar.show('Importing…', 'Please wait');
                 final (imported, skipped) = await zipImport.importFromZip();
-                if (context.mounted) {
-                  Get.snackbar(
+                if (context.mounted && (imported > 0 || skipped > 0)) {
+                  AppSnackbar.show(
                     '✅ Import Complete',
                     '$imported songs added, $skipped skipped',
-                    backgroundColor: neuBase,
-                    snackPosition: SnackPosition.BOTTOM,
                     duration: const Duration(seconds: 4),
                   );
                 }

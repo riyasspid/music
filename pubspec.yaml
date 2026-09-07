@@ -45,6 +45,7 @@ dependencies:
   # Reactive streams
   rxdart: ^0.28.0
   google_fonts: ^8.2.1
+  audio_metadata_reader: ^1.7.1
 
 dev_dependencies:
   flutter_test:

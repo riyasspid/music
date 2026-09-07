@@ -138,6 +138,7 @@ class AudioProvider extends GetxController {
 
   Future<void> toggleShuffle() async {
     final next = !isShuffle.value;
+    isShuffle.value = next;
     await _handler.setShuffleMode(
       next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
     );
@@ -145,17 +146,22 @@ class AudioProvider extends GetxController {
 
   Future<void> cycleLoopMode() async {
     final AudioServiceRepeatMode next;
+    final LoopMode nextMode;
     switch (loopMode.value) {
       case LoopMode.off:
         next = AudioServiceRepeatMode.all;
+        nextMode = LoopMode.all;
         break;
       case LoopMode.all:
         next = AudioServiceRepeatMode.one;
+        nextMode = LoopMode.one;
         break;
       case LoopMode.one:
         next = AudioServiceRepeatMode.none;
+        nextMode = LoopMode.off;
         break;
     }
+    loopMode.value = nextMode;
     await _handler.setRepeatMode(next);
   }
 
@@ -166,9 +172,9 @@ class AudioProvider extends GetxController {
 
   Future<void> toggleLike(Song song) async {
     await _songRepo.toggleLike(song.id);
-    // Refresh if it's the current song
     if (currentSong.value?.id == song.id) {
       currentSong.value = _songRepo.getById(song.id);
+      currentSong.refresh();
     }
   }
 

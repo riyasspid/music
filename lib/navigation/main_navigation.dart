@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Main navigation shell — bottom nav bar + persistent mini player
+// Main navigation shell — bottom nav bar + swipeable PageView + persistent mini player
 // ────────────────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
@@ -19,6 +19,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  late final PageController _pageController;
 
   static const _screens = [
     HomeScreen(),
@@ -29,11 +30,38 @@ class _MainNavigationState extends State<MainNavigation> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    setState(() => _currentIndex = index);
+  }
+
+  void _onNavTapped(int index) {
+    setState(() => _currentIndex = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: neuBase,
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
+        physics: const BouncingScrollPhysics(),
         children: _screens,
       ),
       bottomNavigationBar: Column(
@@ -60,7 +88,7 @@ class _MainNavigationState extends State<MainNavigation> {
             ),
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
+              onTap: _onNavTapped,
               showSelectedLabels: false,
               showUnselectedLabels: false,
               iconSize: 26,

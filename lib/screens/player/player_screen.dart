@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/neumorphic_widget.dart';
+import '../../data/repositories/song_repository.dart';
 import '../../services/audio_provider.dart';
 import '../../widgets/seekbar.dart';
 import '../../widgets/queue_sheet.dart';
@@ -161,22 +162,21 @@ class PlayerScreen extends StatelessWidget {
                       ),
                     ),
                     // Like button
-                    Obx(() => GestureDetector(
-                          onTap: () => audio.toggleLike(song),
-                          child: NeuCircleButton(
-                            size: 44,
-                            child: Icon(
-                              audio.currentSong.value?.isLiked == true
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color:
-                                  audio.currentSong.value?.isLiked == true
-                                      ? likeRed
-                                      : textMid,
-                              size: 22,
-                            ),
+                    Obx(() {
+                      final isLiked =
+                          Get.find<SongRepository>().isLiked(song.id);
+                      return GestureDetector(
+                        onTap: () => audio.toggleLike(song),
+                        child: NeuCircleButton(
+                          size: 44,
+                          child: Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked ? likeRed : textMid,
+                            size: 22,
                           ),
-                        )),
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -197,30 +197,23 @@ class PlayerScreen extends StatelessWidget {
 
               // ── Main controls ─────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     // Previous
                     NeuCircleButton(
-                      size: 52,
+                      size: 58,
                       onTap: audio.previous,
                       child: const Icon(Icons.skip_previous_rounded,
-                          color: textDark, size: 28),
-                    ),
-                    // Seek back 15s
-                    NeuCircleButton(
-                      size: 46,
-                      onTap: () =>
-                          audio.seekRelative(const Duration(seconds: -15)),
-                      child: const Icon(Icons.replay_10, color: textMid, size: 24),
+                          color: textDark, size: 32),
                     ),
                     // Play/Pause (large)
                     Obx(() => GestureDetector(
                           onTap: audio.togglePlayPause,
                           child: Container(
-                            width: 70,
-                            height: 70,
+                            width: 74,
+                            height: 74,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [accentBlue, accentPurple],
@@ -231,7 +224,7 @@ class PlayerScreen extends StatelessWidget {
                               boxShadow: [
                                 BoxShadow(
                                   color: accentBlue.withValues(alpha: 0.35),
-                                  blurRadius: 16,
+                                  blurRadius: 18,
                                   offset: const Offset(0, 6),
                                 ),
                               ],
@@ -241,23 +234,16 @@ class PlayerScreen extends StatelessWidget {
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
                               color: Colors.white,
-                              size: 38,
+                              size: 40,
                             ),
                           ),
                         )),
-                    // Seek forward 15s
-                    NeuCircleButton(
-                      size: 46,
-                      onTap: () =>
-                          audio.seekRelative(const Duration(seconds: 15)),
-                      child: const Icon(Icons.forward_10, color: textMid, size: 24),
-                    ),
                     // Next
                     NeuCircleButton(
-                      size: 52,
+                      size: 58,
                       onTap: audio.next,
                       child: const Icon(Icons.skip_next_rounded,
-                          color: textDark, size: 28),
+                          color: textDark, size: 32),
                     ),
                   ],
                 ),
@@ -301,7 +287,7 @@ class PlayerScreen extends StatelessWidget {
   }
 }
 
-// ─── Animated album art ───────────────────────────────────────────────────────
+// ─── Rotating Vinyl Disk Album Art ───────────────────────────────────────────
 class _AlbumArt extends StatefulWidget {
   final String? coverPath;
   final bool isPlaying;
@@ -314,82 +300,197 @@ class _AlbumArt extends StatefulWidget {
 
 class _AlbumArtState extends State<_AlbumArt>
     with SingleTickerProviderStateMixin {
-  late AnimationController _pulse;
-  late Animation<double> _scale;
+  late final AnimationController _rotationController;
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(
+    _rotationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(seconds: 18), // Slow, realistic vinyl rotation
     );
-    _scale = Tween(begin: 0.97, end: 1.0).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
-    if (widget.isPlaying) _pulse.repeat(reverse: true);
+    if (widget.isPlaying) {
+      _rotationController.repeat();
+    }
   }
 
   @override
-  void didUpdateWidget(_AlbumArt old) {
-    super.didUpdateWidget(old);
-    if (widget.isPlaying && !_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    } else if (!widget.isPlaying && _pulse.isAnimating) {
-      _pulse.stop();
+  void didUpdateWidget(_AlbumArt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying && !_rotationController.isAnimating) {
+      _rotationController.repeat();
+    } else if (!widget.isPlaying && _rotationController.isAnimating) {
+      _rotationController.stop(); // Pauses right at current rotation angle
     }
   }
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _rotationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: Container(
-        width: double.infinity,
-        constraints: const BoxConstraints(maxHeight: 300),
-        decoration: BoxDecoration(
-          color: neuBase,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            const BoxShadow(
-              color: Color(0xFFFFFFFF),
-              blurRadius: 20,
-              offset: Offset(-8, -8),
-            ),
-            BoxShadow(
-              color: const Color(0xFFA3B1C6),
-              blurRadius: 20,
-              offset: const Offset(8, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: widget.coverPath != null && File(widget.coverPath!).existsSync()
-              ? Image.file(File(widget.coverPath!), fit: BoxFit.cover)
-              : Container(
-                  color: const Color(0xFFD0D8E4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.music_note,
-                          size: 80, color: textMid),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No Cover Art',
-                        style: TextStyle(color: textLight, fontSize: 13),
-                      ),
-                    ],
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double maxAvailable = constraints.maxHeight.isFinite && constraints.maxHeight > 0
+            ? constraints.maxHeight - 20
+            : 280.0;
+        final double diskSize = maxAvailable.clamp(200.0, 280.0);
+
+        return Center(
+          child: Container(
+            width: diskSize,
+            height: diskSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
+                const BoxShadow(
+                  color: Colors.white,
+                  blurRadius: 16,
+                  offset: Offset(-6, -6),
+                ),
+                BoxShadow(
+                  color: const Color(0xFFA3B1C6).withValues(alpha: 0.5),
+                  blurRadius: 16,
+                  offset: const Offset(6, 6),
+                ),
+              ],
+            ),
+            child: RotationTransition(
+              turns: _rotationController,
+              child: _VinylDisc(
+                coverPath: widget.coverPath,
+                size: diskSize,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _VinylDisc extends StatelessWidget {
+  final String? coverPath;
+  final double size;
+
+  const _VinylDisc({required this.coverPath, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final spindleSize = size * 0.14;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // ── Cover image filling the entire circular disk space ─────────────
+        Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFFD0D8E4),
+          ),
+          child: ClipOval(
+            child: coverPath != null && File(coverPath!).existsSync()
+                ? Image.file(
+                    File(coverPath!),
+                    fit: BoxFit.cover,
+                    width: size,
+                    height: size,
+                  )
+                : Container(
+                    color: const Color(0xFFD0D8E4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.music_note_rounded,
+                            size: 64, color: accentBlue),
+                        SizedBox(height: 6),
+                        Text(
+                          'No Cover Art',
+                          style: TextStyle(
+                            color: textMid,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
         ),
-      ),
+
+        // ── Subtle glossy disc sheen reflection ───────────────────────────
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: SweepGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.12),
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.12),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+            ),
+          ),
+        ),
+
+        // ── Subtle outer disc edge ring ───────────────────────────────────
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.35),
+              width: 2.0,
+            ),
+          ),
+        ),
+
+        // ── Center spindle metallic ring & hole ───────────────────────────
+        Container(
+          width: spindleSize,
+          height: spindleSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFFFFF), Color(0xFFA3B1C6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 5,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Center(
+            child: Container(
+              width: spindleSize * 0.45,
+              height: spindleSize * 0.45,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: neuBase,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -411,23 +512,30 @@ class _SecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           NeuCircleButton(
-            size: 44,
+            size: 46,
+            isActive: active,
+            onTap: onTap,
             child: Icon(
               icon,
-              color: active ? accentBlue : textMid,
-              size: 20,
+              color: active ? accentBlue : textDark,
+              size: 22,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                fontSize: 10,
-                color: active ? accentBlue : textLight,
-              )),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? accentBlue : textMid,
+            ),
+          ),
         ],
       ),
     );
@@ -443,27 +551,38 @@ class _LoopButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = loopMode != LoopMode.off;
-    final icon = loopMode == LoopMode.one ? Icons.repeat_one : Icons.repeat;
+    final icon = loopMode == LoopMode.one ? Icons.repeat_one_rounded : Icons.repeat_rounded;
     final label = switch (loopMode) {
-      LoopMode.off => 'Loop',
+      LoopMode.off => 'Loop Off',
       LoopMode.all => 'Loop All',
       LoopMode.one => 'Loop 1',
     };
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           NeuCircleButton(
-            size: 44,
-            child: Icon(icon, color: active ? accentBlue : textMid, size: 20),
+            size: 46,
+            isActive: active,
+            onTap: onTap,
+            child: Icon(
+              icon,
+              color: active ? accentBlue : textDark,
+              size: 22,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                fontSize: 10,
-                color: active ? accentBlue : textLight,
-              )),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? accentBlue : textMid,
+            ),
+          ),
         ],
       ),
     );

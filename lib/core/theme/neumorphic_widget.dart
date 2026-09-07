@@ -91,6 +91,7 @@ class NeuCircleButton extends StatefulWidget {
   final VoidCallback? onTap;
   final double size;
   final Color? color;
+  final bool isActive;
 
   const NeuCircleButton({
     super.key,
@@ -98,6 +99,7 @@ class NeuCircleButton extends StatefulWidget {
     this.onTap,
     this.size = 56,
     this.color,
+    this.isActive = false,
   });
 
   @override
@@ -109,6 +111,7 @@ class _NeuCircleButtonState extends State<NeuCircleButton> {
 
   @override
   Widget build(BuildContext context) {
+    final isInset = _pressed || widget.isActive;
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -117,13 +120,18 @@ class _NeuCircleButtonState extends State<NeuCircleButton> {
       },
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 120),
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
-          color: widget.color ?? neuBase,
+          color: widget.isActive
+              ? const Color(0xFFD2DCEB)
+              : (widget.color ?? neuBase),
           shape: BoxShape.circle,
-          boxShadow: _pressed ? neuInsetShadow : neuRaisedShadow,
+          border: widget.isActive
+              ? Border.all(color: accentBlue.withValues(alpha: 0.45), width: 1.5)
+              : null,
+          boxShadow: isInset ? neuInsetShadow : neuRaisedShadow,
         ),
         child: Center(child: widget.child),
       ),

@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/neumorphic_widget.dart';
 import '../../core/utils.dart';
 import '../../data/models/song.dart';
 import '../../data/repositories/song_repository.dart';
@@ -13,198 +12,217 @@ import '../../services/audio_provider.dart';
 import '../../services/import_service.dart';
 import '../../widgets/empty_state.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final repo = Get.find<SongRepository>();
     final audio = Get.find<AudioProvider>();
-    final recent = repo.getRecent(limit: 10);
-    final frequent = repo.getFrequent(limit: 6);
-    final liked = repo.getLiked();
 
     return Scaffold(
       backgroundColor: neuBase,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // ── Header ────────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppUtils.greeting(),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: textMid,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Text(
-                            'Music',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              color: textDark,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    NeuCircleButton(
-                      size: 44,
-                      child: const Icon(Icons.search, color: textMid, size: 20),
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-              ),
-            ),
+        child: Obx(() {
+          final recent = repo.getRecent(limit: 10);
+          final frequent = repo.getFrequent(limit: 6);
+          final liked = repo.getLiked();
 
-            // ── Liked Songs shortcut ──────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: GestureDetector(
-                  onTap: () {
-                    // Show liked songs (navigate to filtered library)
-                    Get.snackbar('Liked Songs', '${liked.length} songs liked');
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF5E7E), Color(0xFFFF9966)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF5E7E).withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.favorite, color: Colors.white, size: 32),
-                        const SizedBox(width: 12),
-                        Column(
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // ── Header ───────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Liked Songs',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
+                            Text(
+                              AppUtils.greeting(),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: textMid,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            Text(
-                              '${liked.length} songs',
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 12),
+                            const Text(
+                              'Music',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: textDark,
+                              ),
                             ),
                           ],
                         ),
-                        const Spacer(),
-                        const Icon(Icons.play_circle_fill,
-                            color: Colors.white, size: 38),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
 
-            // ── Recommended ───────────────────────────────────────────────
-            if (frequent.isNotEmpty) ...[
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
-                  child: Text(
-                    'Recommended For You',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: textDark,
-                    ),
-                  ),
-                ),
-              ),
+              // ── Liked Songs shortcut ─────────────────────────────────────
               SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 160,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: frequent.length,
-                    itemBuilder: (_, i) =>
-                        _SongCard(song: frequent[i], audio: audio),
-                  ),
-                ),
-              ),
-            ],
-
-            // ── Recently Added ────────────────────────────────────────────
-            if (recent.isNotEmpty) ...[
-              const SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-                  child: Text(
-                    'Recently Added',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: textDark,
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (liked.isNotEmpty) {
+                        audio.playSong(liked.first, songList: liked);
+                        AppSnackbar.show(
+                          '❤️ Liked Songs',
+                          'Playing ${liked.length} liked track${liked.length == 1 ? '' : 's'}',
+                        );
+                      } else {
+                        AppSnackbar.show(
+                          'No Liked Songs',
+                          'Tap the heart icon on any track to add it to Liked Songs',
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF5E7E), Color(0xFFFF9966)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                const Color(0xFFFF5E7E).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.favorite,
+                              color: Colors.white, size: 32),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Liked Songs',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                '${liked.length} songs',
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.play_circle_fill,
+                              color: Colors.white, size: 38),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) {
-                    final song = recent[i];
-                    return Obx(() => _RecentTile(
-                          song: song,
-                          isPlaying:
-                              audio.currentSong.value?.id == song.id,
-                          onTap: () =>
-                              audio.playSong(song, songList: recent),
-                        ));
-                  },
-                  childCount: recent.take(5).length,
-                ),
-              ),
-            ],
 
-            // Empty state — no songs in library at all
-            if (recent.isEmpty && frequent.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyState(
-                  icon: Icons.music_note_outlined,
-                  title: 'Your library is empty',
-                  actionLabel: 'Import a Song',
-                  onAction: () async {
-                    final svc = Get.find<ImportService>();
-                    await svc.importSingleSong(context);
-                  },
+              // ── Recommended ──────────────────────────────────────────────
+              if (frequent.isNotEmpty) ...[
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 24, 20, 10),
+                    child: Text(
+                      'Recommended For You',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
                 ),
-              )
-            else
-              const SliverToBoxAdapter(child: SizedBox(height: 110)),
-          ],
-        ),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 160,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: frequent.length,
+                      itemBuilder: (_, i) =>
+                          _SongCard(song: frequent[i], audio: audio),
+                    ),
+                  ),
+                ),
+              ],
+
+              // ── Recently Added ───────────────────────────────────────────
+              if (recent.isNotEmpty) ...[
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Text(
+                      'Recently Added',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) {
+                      final song = recent[i];
+                      return Obx(() => _RecentTile(
+                            song: song,
+                            isPlaying: audio.currentSong.value?.id == song.id,
+                            onTap: () => audio.playSong(song, songList: recent),
+                          ));
+                    },
+                    childCount: recent.take(5).length,
+                  ),
+                ),
+              ],
+
+              // Empty state — no songs in library at all
+              if (recent.isEmpty && frequent.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyState(
+                    icon: Icons.music_note_outlined,
+                    title: 'Your library is empty',
+                    actionLabel: 'Import a Song',
+                    onAction: () async {
+                      final svc = Get.find<ImportService>();
+                      await svc.importSingleSong(context);
+                    },
+                  ),
+                )
+              else
+                const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -243,8 +261,7 @@ class _SongCard extends StatelessWidget {
                 child: song.coverPath != null &&
                         File(song.coverPath!).existsSync()
                     ? Image.file(File(song.coverPath!), fit: BoxFit.cover)
-                    : const Icon(Icons.music_note,
-                        size: 40, color: textMid),
+                    : const Icon(Icons.music_note, size: 40, color: textMid),
               ),
             ),
             Padding(
@@ -282,8 +299,7 @@ class _RecentTile extends StatelessWidget {
   final bool isPlaying;
   final VoidCallback? onTap;
 
-  const _RecentTile(
-      {required this.song, this.isPlaying = false, this.onTap});
+  const _RecentTile({required this.song, this.isPlaying = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -306,8 +322,7 @@ class _RecentTile extends StatelessWidget {
             boxShadow: neuSoftShadow,
             image: song.coverPath != null && File(song.coverPath!).existsSync()
                 ? DecorationImage(
-                    image: FileImage(File(song.coverPath!)),
-                    fit: BoxFit.cover)
+                    image: FileImage(File(song.coverPath!)), fit: BoxFit.cover)
                 : null,
           ),
           child: (song.coverPath == null || !File(song.coverPath!).existsSync())

@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Custom Neumorphic seek bar with time labels
+// Custom Neumorphic seek bar with time labels, drag-to-seek, and 0-gap thumb
 // ────────────────────────────────────────────────────────────────────────────
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
@@ -24,88 +24,163 @@ class SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<SeekBar> {
-  double? _dragValue;
+  bool _isDragging = false;
+  int _dragMs = 0;
+
+  void _handleDrag(double localDx, double totalWidth) {
+    if (totalWidth <= 0) return;
+    final ratio = (localDx / totalWidth).clamp(0.0, 1.0);
+    final maxMs = widget.duration.inMilliseconds;
+    final targetMs = (ratio * maxMs).round();
+    setState(() {
+      _dragMs = targetMs;
+    });
+    widget.onChanged?.call(Duration(milliseconds: targetMs));
+  }
+
+  void _finishDrag() {
+    widget.onChangeEnd?.call(Duration(milliseconds: _dragMs));
+    setState(() {
+      _isDragging = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.duration.inMilliseconds > 0
-        ? (_dragValue ??
-                widget.position.inMilliseconds.toDouble().clamp(
-                    0.0, widget.duration.inMilliseconds.toDouble()))
-            .toDouble()
-        : 0.0;
+    final maxMs = widget.duration.inMilliseconds;
+    final currentMs = _isDragging
+        ? _dragMs
+        : widget.position.inMilliseconds.clamp(0, maxMs > 0 ? maxMs : 0);
 
-    final max = widget.duration.inMilliseconds.toDouble();
+    final ratio = maxMs > 0 ? (currentMs / maxMs).clamp(0.0, 1.0) : 0.0;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          height: 6,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: neuBase,
-            borderRadius: BorderRadius.circular(3),
-            boxShadow: neuInsetShadow,
-          ),
-          child: Stack(
-            children: [
-              // Progress fill
-              FractionallySizedBox(
-                widthFactor: max > 0 ? (progress / max).clamp(0.0, 1.0) : 0,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [accentBlue, accentPurple],
+        // ── Interactive seek bar with generous touch target ────────────────
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            final thumbRadius = 8.0;
+            final trackHeight = 6.0;
+
+            // Compute active track fill width and thumb center
+            final activeWidth = (ratio * trackWidth).clamp(0.0, trackWidth);
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (details) {
+                setState(() => _isDragging = true);
+                _handleDrag(details.localPosition.dx, trackWidth);
+              },
+              onHorizontalDragUpdate: (details) {
+                _handleDrag(details.localPosition.dx, trackWidth);
+              },
+              onHorizontalDragEnd: (_) => _finishDrag(),
+              onHorizontalDragCancel: () {
+                setState(() => _isDragging = false);
+              },
+              onTapDown: (details) {
+                _handleDrag(details.localPosition.dx, trackWidth);
+                _finishDrag();
+              },
+              child: SizedBox(
+                height: 36, // Comfortable touch target height
+                width: double.infinity,
+                child: Center(
+                  child: SizedBox(
+                    height: thumbRadius * 2 + 4,
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        // Inset background track
+                        Container(
+                          height: trackHeight,
+                          width: trackWidth,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD3D9E2),
+                            borderRadius: BorderRadius.circular(trackHeight / 2),
+                            boxShadow: neuInsetShadow,
+                          ),
+                        ),
+
+                        // Active gradient fill (meets thumb precisely with 0 gap)
+                        Container(
+                          height: trackHeight,
+                          width: activeWidth,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [accentBlue, accentPurple],
+                            ),
+                            borderRadius: BorderRadius.circular(trackHeight / 2),
+                          ),
+                        ),
+
+                        // Draggable thumb dot (positioned at activeWidth - thumbRadius)
+                        Positioned(
+                          left: (activeWidth - thumbRadius).clamp(
+                            0.0,
+                            trackWidth - (thumbRadius * 2),
+                          ),
+                          child: Container(
+                            width: thumbRadius * 2,
+                            height: thumbRadius * 2,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF7BA6FF), accentBlue],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accentBlue.withValues(alpha: 0.45),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                                const BoxShadow(
+                                  color: Colors.white,
+                                  blurRadius: 2,
+                                  offset: Offset(-1, -1),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ),
-              // Invisible slider for interaction
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 6,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                  activeTrackColor: Colors.transparent,
-                  inactiveTrackColor: Colors.transparent,
-                  thumbColor: accentBlue,
-                  overlayColor: accentBlue.withValues(alpha: 0.2),
-                ),
-                child: Slider(
-                  min: 0,
-                  max: max > 0 ? max : 1,
-                  value: progress.clamp(0, max > 0 ? max : 1),
-                  onChanged: (v) {
-                    setState(() => _dragValue = v);
-                    widget.onChanged?.call(Duration(milliseconds: v.toInt()));
-                  },
-                  onChangeEnd: (v) {
-                    widget.onChangeEnd?.call(Duration(milliseconds: v.toInt()));
-                    setState(() => _dragValue = null);
-                  },
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
-        const SizedBox(height: 8),
+
+        // ── Time labels ────────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                AppUtils.formatDuration(
-                    (_dragValue != null
-                            ? _dragValue! ~/ 1000
-                            : widget.position.inSeconds)
-                        .toInt()),
-                style: const TextStyle(fontSize: 12, color: textMid),
+                AppUtils.formatDuration((currentMs ~/ 1000).toInt()),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: textMid,
+                ),
               ),
               Text(
                 AppUtils.formatDuration(widget.duration.inSeconds.toInt()),
-                style: const TextStyle(fontSize: 12, color: textMid),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: textMid,
+                ),
               ),
             ],
           ),

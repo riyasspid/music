@@ -10,14 +10,23 @@ import '../../services/audio_provider.dart';
 import '../../widgets/song_tile.dart';
 import '../../widgets/empty_state.dart';
 
-class FrequentScreen extends StatelessWidget {
+class FrequentScreen extends StatefulWidget {
   const FrequentScreen({super.key});
 
   @override
+  State<FrequentScreen> createState() => _FrequentScreenState();
+}
+
+class _FrequentScreenState extends State<FrequentScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final repo = Get.find<SongRepository>();
     final audio = Get.find<AudioProvider>();
-    final songs = repo.getFrequent();
 
     return Scaffold(
       backgroundColor: neuBase,
@@ -60,29 +69,35 @@ class FrequentScreen extends StatelessWidget {
 
             // Song list
             Expanded(
-              child: songs.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.trending_up_rounded,
-                      title: 'No play history yet',
-                      iconColor: accentBlue,
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(0, 4, 0, 110),
-                      itemCount: songs.length,
-                      itemBuilder: (_, i) {
-                        final song = songs[i];
-                        return Obx(() => SongTile(
-                              song: song,
-                              isPlaying:
-                                  audio.currentSong.value?.id == song.id,
-                              showPlayCount: true,
-                              onTap: () =>
-                                  audio.playSong(song, songList: songs),
-                              onLike: () => audio.toggleLike(song),
-                              onAddToQueue: () => audio.addToQueue(song),
-                            ));
-                      },
-                    ),
+              child: Obx(() {
+                final songs = repo.getFrequent();
+
+                if (songs.isEmpty) {
+                  return const EmptyState(
+                    icon: Icons.trending_up_rounded,
+                    title: 'No play history yet',
+                    iconColor: accentBlue,
+                  );
+                }
+
+                return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 110),
+                  itemCount: songs.length,
+                  itemBuilder: (_, i) {
+                    final song = songs[i];
+                    return Obx(() => SongTile(
+                          song: song,
+                          isLiked: repo.isLiked(song.id),
+                          isPlaying: audio.currentSong.value?.id == song.id,
+                          showPlayCount: true,
+                          onTap: () => audio.playSong(song, songList: songs),
+                          onLike: () => audio.toggleLike(song),
+                          onAddToQueue: () => audio.addToQueue(song),
+                        ));
+                  },
+                );
+              }),
             ),
           ],
         ),

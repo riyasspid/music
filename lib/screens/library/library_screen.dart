@@ -11,6 +11,7 @@ import '../../services/audio_provider.dart';
 import '../../services/import_service.dart';
 import '../../widgets/song_tile.dart';
 import '../../widgets/empty_state.dart';
+import '../../core/utils.dart';
 
 enum _SortMode { az, dateAdded, mostPlayed, duration }
 
@@ -21,10 +22,15 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen> {
+class _LibraryScreenState extends State<LibraryScreen>
+    with AutomaticKeepAliveClientMixin {
   final _searchCtrl = TextEditingController();
   _SortMode _sort = _SortMode.dateAdded;
   String _query = '';
+  bool _isDeleting = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -32,8 +38,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     super.dispose();
   }
 
-  List<Song> _getSongs() {
-    final repo = Get.find<SongRepository>();
+  List<Song> _getSongs(SongRepository repo) {
     var songs = repo.getAll();
 
     // Filter
@@ -66,9 +71,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final audio = Get.find<AudioProvider>();
+    final repo = Get.find<SongRepository>();
     final importSvc = Get.find<ImportService>();
-    final songs = _getSongs();
 
     return Scaffold(
       backgroundColor: neuBase,
@@ -90,10 +96,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                     ),
                   ),
-                  Text(
-                    '${songs.length} songs',
-                    style: const TextStyle(fontSize: 12, color: textMid),
-                  ),
+                  Obx(() => Text(
+                        '${repo.songs.length} songs',
+                        style: const TextStyle(fontSize: 12, color: textMid),
+                      )),
                 ],
               ),
             ),
@@ -147,8 +153,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
             // ── Song list ─────────────────────────────────────────────────
             Expanded(
-              child: songs.isEmpty
-                  ? (_query.isNotEmpty
+              child: Obx(() {
+                final songs = _getSongs(repo);
+
+                if (songs.isEmpty) {
+                  return _query.isNotEmpty
                       // Search returned nothing
                       ? SearchEmptyState(query: _query)
                       // Library is completely empty
@@ -157,90 +166,98 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           title: 'Library is empty',
                           actionLabel: 'Import Song',
                           onAction: () async {
-                            final svc = Get.find<ImportService>();
-                            final song = await svc.importSingleSong(context);
-                            if (song != null) setState(() {});
+                            await importSvc.importSingleSong(context);
                           },
-                        ))
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(0, 4, 0, 110),
-                      itemCount: songs.length,
-                      itemBuilder: (_, i) {
-                        final song = songs[i];
-                        return Obx(() => SongTile(
-                              song: song,
-                              isPlaying:
-                                 audio.currentSong.value?.id == song.id,
-                              onTap: () =>
-                                  audio.playSong(song, songList: songs),
-                              onLike: () => audio.toggleLike(song),
-                              onDelete: () => _deleteSong(song),
-                              onAddToQueue: () => audio.addToQueue(song),
-                            ));
-                      },
-                    ),
+                        );
+                }
+
+                return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(0, 4, 0, 110),
+                  itemCount: songs.length,
+                  itemBuilder: (_, i) {
+                    final song = songs[i];
+                    return Obx(() => SongTile(
+                          song: song,
+                          isLiked: repo.isLiked(song.id),
+                          isPlaying: audio.currentSong.value?.id == song.id,
+                          onTap: () => audio.playSong(song, songList: songs),
+                          onLike: () => audio.toggleLike(song),
+                          onDelete: () => _deleteSong(song),
+                          onAddToQueue: () => audio.addToQueue(song),
+                        ));
+                  },
+                );
+              }),
             ),
           ],
         ),
       ),
+      floatingActionButton: Obx(() {
+        final hasSongs = repo.songs.isNotEmpty;
+        if (!hasSongs) return const SizedBox.shrink();
 
-      // ── Import FAB (only shown when library already has songs) ──────────────
-      floatingActionButton: songs.isNotEmpty
-          ? NeuButton(
-              borderRadius: 18,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              onTap: () async {
-                final song = await importSvc.importSingleSong(context);
-                if (song != null) {
-                  setState(() {});
-                  Get.snackbar(
-                    'Imported!',
-                    '"${song.title}" added to your library',
-                    backgroundColor: neuBase,
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                }
-              },
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add, color: accentBlue),
-                  SizedBox(width: 6),
-                  Text(
-                    'Import Song',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, color: accentBlue),
-                  ),
-                ],
-              ),
-            )
-          : null,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 70),
+          child: NeuButton(
+            borderRadius: 20,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            onTap: () async {
+              final song = await importSvc.importSingleSong(context);
+              if (song != null && context.mounted) {
+                AppSnackbar.show(
+                  '✅ Imported!',
+                  '"${song.title}" added to library',
+                );
+              }
+            },
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add, color: accentBlue),
+                SizedBox(width: 6),
+                Text(
+                  'Import Song',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, color: accentBlue),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
     );
   }
 
   Future<void> _deleteSong(Song song) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: neuBase,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Song'),
-        content: Text('Delete "${song.title}"? This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await Get.find<SongRepository>().delete(song.id);
-      setState(() {});
+    if (_isDeleting) return;
+    _isDeleting = true;
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: neuBase,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Song'),
+          content: Text('Delete "${song.title}"? This cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+      if (confirm == true) {
+        await Get.find<SongRepository>().delete(song.id);
+        AppSnackbar.show('Deleted', '"${song.title}" removed from library');
+      }
+    } finally {
+      _isDeleting = false;
     }
   }
 }

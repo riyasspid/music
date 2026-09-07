@@ -12,56 +12,63 @@ import '../data/repositories/song_repository.dart';
 
 class ExportService {
   final SongRepository _repo;
+  bool _isExporting = false;
 
   ExportService(this._repo);
 
   /// Creates a ZIP file in Downloads containing all songs + metadata.
   /// Returns the path to the created ZIP, or null on failure.
   Future<String?> exportAll() async {
-    final songs = _repo.getAll();
-    if (songs.isEmpty) return null;
+    if (_isExporting) return null;
+    _isExporting = true;
+    try {
+      final songs = _repo.getAll();
+      if (songs.isEmpty) return null;
 
-    final encoder = ZipFileEncoder();
+      final encoder = ZipFileEncoder();
 
-    // Write to external Downloads directory
-    final downloadsDir = await _getDownloadsDir();
-    final now = DateTime.now();
-    final fileName =
-        'music_${now.year}${_pad(now.month)}${_pad(now.day)}.zip';
-    final zipPath = p.join(downloadsDir.path, fileName);
+      // Write to external Downloads directory
+      final downloadsDir = await _getDownloadsDir();
+      final now = DateTime.now();
+      final fileName =
+          'music_${now.year}${_pad(now.month)}${_pad(now.day)}.zip';
+      final zipPath = p.join(downloadsDir.path, fileName);
 
-    encoder.create(zipPath);
+      encoder.create(zipPath);
 
-    // metadata.json
-    final metadata = songs.map((s) => _songToExportJson(s)).toList();
-    final metaBytes = utf8.encode(jsonEncode(metadata));
-    encoder.addArchiveFile(
-      ArchiveFile(AppConstants.metadataFileName, metaBytes.length, metaBytes),
-    );
+      // metadata.json
+      final metadata = songs.map((s) => _songToExportJson(s)).toList();
+      final metaBytes = utf8.encode(jsonEncode(metadata));
+      encoder.addArchiveFile(
+        ArchiveFile(AppConstants.metadataFileName, metaBytes.length, metaBytes),
+      );
 
-    // Song files
-    for (final song in songs) {
-      final file = File(song.filePath);
-      if (file.existsSync()) {
-        final ext = p.extension(song.filePath);
-        encoder.addFile(file, '${AppConstants.songsFolder}/${song.id}$ext');
-      }
-    }
-
-    // Cover art files
-    for (final song in songs) {
-      if (song.coverPath != null) {
-        final coverFile = File(song.coverPath!);
-        if (coverFile.existsSync()) {
-          final ext = p.extension(song.coverPath!);
-          encoder.addFile(
-              coverFile, '${AppConstants.coversFolder}/${song.id}$ext');
+      // Song files
+      for (final song in songs) {
+        final file = File(song.filePath);
+        if (file.existsSync()) {
+          final ext = p.extension(song.filePath);
+          encoder.addFile(file, '${AppConstants.songsFolder}/${song.id}$ext');
         }
       }
-    }
 
-    encoder.close();
-    return zipPath;
+      // Cover art files
+      for (final song in songs) {
+        if (song.coverPath != null) {
+          final coverFile = File(song.coverPath!);
+          if (coverFile.existsSync()) {
+            final ext = p.extension(song.coverPath!);
+            encoder.addFile(
+                coverFile, '${AppConstants.coversFolder}/${song.id}$ext');
+          }
+        }
+      }
+
+      encoder.close();
+      return zipPath;
+    } finally {
+      _isExporting = false;
+    }
   }
 
   Map<String, dynamic> _songToExportJson(Song song) {

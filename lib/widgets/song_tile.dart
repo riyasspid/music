@@ -12,6 +12,7 @@ class SongTile extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onDelete;
+  final bool? isLiked;
   final VoidCallback? onAddToQueue;
   final bool showPlayCount;
 
@@ -19,6 +20,7 @@ class SongTile extends StatelessWidget {
     super.key,
     required this.song,
     this.isPlaying = false,
+    this.isLiked,
     this.onTap,
     this.onLike,
     this.onDelete,
@@ -80,16 +82,21 @@ class SongTile extends StatelessWidget {
               song.durationFormatted,
               style: const TextStyle(fontSize: 11, color: textLight),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: onLike,
-              child: Icon(
-                song.isLiked ? Icons.favorite : Icons.favorite_border,
-                color: song.isLiked ? likeRed : textLight,
-                size: 18,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  (isLiked ?? song.isLiked)
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: (isLiked ?? song.isLiked) ? likeRed : textLight,
+                  size: 20,
+                ),
               ),
             ),
-            const SizedBox(width: 4),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, size: 18, color: textLight),
               color: neuBase,
@@ -108,7 +115,7 @@ class SongTile extends StatelessWidget {
                 ),
                 PopupMenuItem(
                   value: 'like',
-                  child: Text(song.isLiked ? 'Unlike' : 'Like'),
+                  child: Text((isLiked ?? song.isLiked) ? 'Unlike' : 'Like'),
                 ),
                 const PopupMenuItem(
                   value: 'delete',

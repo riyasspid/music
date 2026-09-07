@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/neumorphic_widget.dart';
 import '../../services/import_service.dart';
 import '../../services/zip_import_service.dart';
+import '../../core/utils.dart';
 
 class UploadScreen extends StatelessWidget {
   const UploadScreen({super.key});
@@ -49,11 +50,9 @@ class UploadScreen extends StatelessWidget {
                 onTap: () async {
                   final song = await importSvc.importSingleSong(context);
                   if (song != null && context.mounted) {
-                    Get.snackbar(
+                    AppSnackbar.show(
                       '✅ Imported!',
                       '"${song.title}" by ${song.author} added',
-                      backgroundColor: neuBase,
-                      snackPosition: SnackPosition.BOTTOM,
                       duration: const Duration(seconds: 3),
                     );
                   }
@@ -69,16 +68,12 @@ class UploadScreen extends StatelessWidget {
                 subtitle: 'Restore a GrooveBox backup with all metadata',
                 color: accentPurple,
                 onTap: () async {
-                  Get.snackbar('Importing…', 'Please wait',
-                      backgroundColor: neuBase,
-                      snackPosition: SnackPosition.BOTTOM);
+                  AppSnackbar.show('Importing…', 'Please wait');
                   final (imported, skipped) = await zipImport.importFromZip();
-                  if (context.mounted) {
-                    Get.snackbar(
+                  if (context.mounted && (imported > 0 || skipped > 0)) {
+                    AppSnackbar.show(
                       '✅ ZIP Imported',
                       '$imported songs added, $skipped skipped (duplicates)',
-                      backgroundColor: neuBase,
-                      snackPosition: SnackPosition.BOTTOM,
                       duration: const Duration(seconds: 4),
                     );
                   }

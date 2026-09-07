@@ -20,15 +20,18 @@ class PlaylistsScreen extends StatefulWidget {
   State<PlaylistsScreen> createState() => _PlaylistsScreenState();
 }
 
-class _PlaylistsScreenState extends State<PlaylistsScreen> {
+class _PlaylistsScreenState extends State<PlaylistsScreen>
+    with AutomaticKeepAliveClientMixin {
   final _uuid = const Uuid();
+  bool _isCreatingPlaylist = false;
 
-  List<Playlist> _getPlaylists() =>
-      Get.find<PlaylistRepository>().getAll();
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    final playlists = _getPlaylists();
+    super.build(context);
+    final playlistRepo = Get.find<PlaylistRepository>();
 
     return Scaffold(
       backgroundColor: neuBase,
@@ -75,40 +78,44 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
             // Grid
             Expanded(
-              child: playlists.isEmpty
-                  ? EmptyState(
-                      icon: Icons.queue_music,
-                      title: 'No playlists yet',
-                      actionLabel: 'Create Playlist',
-                      onAction: () => _createPlaylist(context),
-                      iconColor: accentPurple,
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.85,
-                      ),
-                      itemCount: playlists.length,
-                      itemBuilder: (_, i) => _PlaylistCard(
-                        playlist: playlists[i],
-                        onTap: () async {
-                          await Get.to(
-                              () => PlaylistDetailScreen(
-                                  playlist: playlists[i]),
-                              transition: Transition.rightToLeft);
-                          setState(() {});
-                        },
-                        onDelete: () async {
-                          await Get.find<PlaylistRepository>()
-                              .delete(playlists[i].id);
-                          setState(() {});
-                        },
-                      ),
-                    ),
+              child: Obx(() {
+                final playlists = playlistRepo.playlists;
+
+                if (playlists.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.queue_music,
+                    title: 'No playlists yet',
+                    actionLabel: 'Create Playlist',
+                    onAction: () => _createPlaylist(context),
+                    iconColor: accentPurple,
+                  );
+                }
+
+                return GridView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: playlists.length,
+                  itemBuilder: (_, i) => _PlaylistCard(
+                    playlist: playlists[i],
+                    onTap: () async {
+                      await Get.to(
+                          () => PlaylistDetailScreen(
+                              playlist: playlists[i]),
+                          transition: Transition.rightToLeft);
+                    },
+                    onDelete: () async {
+                      await playlistRepo.delete(playlists[i].id);
+                    },
+                  ),
+                );
+              }),
             ),
           ],
         ),
@@ -117,42 +124,48 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   Future<void> _createPlaylist(BuildContext context) async {
-    final ctrl = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: neuBase,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('New Playlist'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Playlist name...',
-            border: OutlineInputBorder(),
+    if (_isCreatingPlaylist) return;
+    _isCreatingPlaylist = true;
+    try {
+      final ctrl = TextEditingController();
+      final name = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: neuBase,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('New Playlist'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Playlist name...',
+              border: OutlineInputBorder(),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-    if (name != null && name.isNotEmpty) {
-      final pl = Playlist(
-        id: _uuid.v4(),
-        name: name,
-        songIds: [],
-        createdAt: DateTime.now(),
       );
-      await Get.find<PlaylistRepository>().save(pl);
-      setState(() {});
+      if (name != null && name.isNotEmpty) {
+        final pl = Playlist(
+          id: _uuid.v4(),
+          name: name,
+          songIds: [],
+          createdAt: DateTime.now(),
+        );
+        await Get.find<PlaylistRepository>().save(pl);
+        setState(() {});
+      }
+    } finally {
+      _isCreatingPlaylist = false;
     }
   }
 }
