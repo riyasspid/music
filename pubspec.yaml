@@ -2,7 +2,7 @@ name: music
 description: "Personal offline music player app."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.12.0
@@ -46,6 +46,7 @@ dependencies:
   rxdart: ^0.28.0
   google_fonts: ^8.2.1
   audio_metadata_reader: ^1.7.1
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:
@@ -53,8 +54,15 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   hive_generator: ^2.0.1
   build_runner: ^2.4.12
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "logo.png"
+

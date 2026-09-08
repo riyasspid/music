@@ -8,6 +8,7 @@ import '../../core/theme/neumorphic_widget.dart';
 import '../../services/export_service.dart';
 import '../../services/sleep_timer_service.dart';
 import '../../services/zip_import_service.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/utils.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -47,17 +48,43 @@ class SettingsScreen extends StatelessWidget {
               title: 'Export ZIP',
               subtitle: 'Download all songs + metadata as a ZIP backup',
               onTap: () async {
-                AppSnackbar.show('Exporting…', 'Building your ZIP');
-                final path = await exportSvc.exportAll();
-                if (path != null && context.mounted) {
-                  AppSnackbar.show(
-                    '✅ Export Complete',
-                    'Saved to Downloads: ${path.split('/').last}',
-                    duration: const Duration(seconds: 5),
-                  );
-                } else if (context.mounted) {
-                  AppSnackbar.show('Export Failed',
-                      'No songs to export or an error occurred');
+                final progress = 0.0.obs;
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: neuBase,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Exporting ZIP'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Bundling your songs and metadata...', style: TextStyle(color: textMid, fontSize: 13)),
+                        const SizedBox(height: 20),
+                        Obx(() => LinearProgressIndicator(
+                          value: progress.value,
+                          color: accentBlue,
+                          backgroundColor: Colors.grey[300],
+                        )),
+                      ],
+                    ),
+                  ),
+                );
+
+                // Allow the UI to render the dialog before starting heavy blocking work
+                await Future.delayed(const Duration(milliseconds: 100));
+
+                final path = await exportSvc.exportAll(
+                  onProgress: (p) => progress.value = p,
+                );
+
+                if (context.mounted) {
+                  Navigator.pop(context); // close progress dialog
+                  if (path != null) {
+                    await Share.shareXFiles([XFile(path)], subject: 'Music Backup');
+                  } else {
+                    AppSnackbar.show('Export Failed', 'No songs to export or an error occurred');
+                  }
                 }
               },
             ),
@@ -70,14 +97,46 @@ class SettingsScreen extends StatelessWidget {
               title: 'Import ZIP',
               subtitle: 'Restore songs from a Music ZIP backup',
               onTap: () async {
-                AppSnackbar.show('Importing…', 'Please wait');
-                final (imported, skipped) = await zipImport.importFromZip();
-                if (context.mounted && (imported > 0 || skipped > 0)) {
-                  AppSnackbar.show(
-                    '✅ Import Complete',
-                    '$imported songs added, $skipped skipped',
-                    duration: const Duration(seconds: 4),
-                  );
+                final progress = 0.0.obs;
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: neuBase,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Importing ZIP'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Extracting and restoring songs...', style: TextStyle(color: textMid, fontSize: 13)),
+                        const SizedBox(height: 20),
+                        Obx(() => LinearProgressIndicator(
+                          value: progress.value,
+                          color: accentPurple,
+                          backgroundColor: Colors.grey[300],
+                        )),
+                      ],
+                    ),
+                  ),
+                );
+
+                await Future.delayed(const Duration(milliseconds: 100));
+
+                final (imported, skipped) = await zipImport.importFromZip(
+                  onProgress: (p) => progress.value = p,
+                );
+
+                if (context.mounted) {
+                  Navigator.pop(context); // close progress dialog
+                  if (imported > 0 || skipped > 0) {
+                    AppSnackbar.show(
+                      '✅ Import Complete',
+                      '$imported songs added, $skipped skipped',
+                      duration: const Duration(seconds: 4),
+                    );
+                  } else {
+                    AppSnackbar.show('Import Failed', 'No valid ZIP selected or error reading file');
+                  }
                 }
               },
             ),

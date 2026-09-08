@@ -12,6 +12,7 @@ import '../../services/import_service.dart';
 import '../../widgets/song_tile.dart';
 import '../../widgets/empty_state.dart';
 import '../../core/utils.dart';
+import '../../widgets/playlist_picker_sheet.dart';
 
 enum _SortMode { az, dateAdded, mostPlayed, duration }
 
@@ -28,6 +29,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   _SortMode _sort = _SortMode.dateAdded;
   String _query = '';
   bool _isDeleting = false;
+  final RxSet<String> _selectedIds = <String>{}.obs;
 
   @override
   bool get wantKeepAlive => true;
@@ -82,27 +84,62 @@ class _LibraryScreenState extends State<LibraryScreen>
         child: Column(
           children: [
             // ── Header ─────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Library',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: textDark,
+            Obx(() {
+              if (_selectedIds.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close, color: textDark),
+                        onPressed: () => _selectedIds.clear(),
+                      ),
+                      Text(
+                        '${_selectedIds.length} Selected',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: textDark,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.playlist_add, color: accentPurple),
+                        onPressed: () {
+                          PlaylistPickerSheet.show(context, _selectedIds.toList());
+                          _selectedIds.clear();
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _deleteSelectedSongs(),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Library',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: textDark,
+                        ),
                       ),
                     ),
-                  ),
-                  Obx(() => Text(
-                        '${repo.songs.length} songs',
-                        style: const TextStyle(fontSize: 12, color: textMid),
-                      )),
-                ],
-              ),
-            ),
+                    Obx(() => Text(
+                          '${repo.songs.length} songs',
+                          style: const TextStyle(fontSize: 12, color: textMid),
+                        )),
+                  ],
+                ),
+              );
+            }),
 
             // ── Search bar ────────────────────────────────────────────────
             Padding(
@@ -164,9 +201,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       : EmptyState(
                           icon: Icons.library_music_outlined,
                           title: 'Library is empty',
-                          actionLabel: 'Import Song',
+                          actionLabel: 'Import Song(s)',
                           onAction: () async {
-                            await importSvc.importSingleSong(context);
+                            await importSvc.importSongs(context);
                           },
                         );
                 }
@@ -177,15 +214,37 @@ class _LibraryScreenState extends State<LibraryScreen>
                   itemCount: songs.length,
                   itemBuilder: (_, i) {
                     final song = songs[i];
-                    return Obx(() => SongTile(
-                          song: song,
-                          isLiked: repo.isLiked(song.id),
-                          isPlaying: audio.currentSong.value?.id == song.id,
-                          onTap: () => audio.playSong(song, songList: songs),
-                          onLike: () => audio.toggleLike(song),
-                          onDelete: () => _deleteSong(song),
-                          onAddToQueue: () => audio.addToQueue(song),
-                        ));
+                    return Obx(() {
+                      final isSelected = _selectedIds.contains(song.id);
+                      return SongTile(
+                        song: song,
+                        isLiked: repo.isLiked(song.id),
+                        isPlaying: audio.currentSong.value?.id == song.id,
+                        isSelected: isSelected,
+                        onLongPress: () {
+                          if (isSelected) {
+                            _selectedIds.remove(song.id);
+                          } else {
+                            _selectedIds.add(song.id);
+                          }
+                        },
+                        onTap: () {
+                          if (_selectedIds.isNotEmpty) {
+                            if (isSelected) {
+                              _selectedIds.remove(song.id);
+                            } else {
+                              _selectedIds.add(song.id);
+                            }
+                          } else {
+                            audio.playSong(song, songList: songs);
+                          }
+                        },
+                        onLike: () => audio.toggleLike(song),
+                        onDelete: () => _deleteSong(song),
+                        onAddToQueue: () => audio.addToQueue(song),
+                        onAddToPlaylist: () => PlaylistPickerSheet.show(context, [song.id]),
+                      );
+                    });
                   },
                 );
               }),
@@ -193,40 +252,44 @@ class _LibraryScreenState extends State<LibraryScreen>
           ],
         ),
       ),
-      floatingActionButton: Obx(() {
-        final hasSongs = repo.songs.isNotEmpty;
-        if (!hasSongs) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 70),
-          child: NeuButton(
-            borderRadius: 20,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            onTap: () async {
-              final song = await importSvc.importSingleSong(context);
-              if (song != null && context.mounted) {
-                AppSnackbar.show(
-                  '✅ Imported!',
-                  '"${song.title}" added to library',
-                );
-              }
-            },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add, color: accentBlue),
-                SizedBox(width: 6),
-                Text(
-                  'Import Song',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, color: accentBlue),
-                ),
-              ],
-            ),
-          ),
-        );
-      }),
     );
+  }
+
+  Future<void> _deleteSelectedSongs() async {
+    if (_isDeleting || _selectedIds.isEmpty) return;
+    final idsToDelete = _selectedIds.toList();
+    _isDeleting = true;
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: neuBase,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Songs'),
+          content: Text('Delete ${idsToDelete.length} song(s)? This cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+      if (confirm == true) {
+        final repo = Get.find<SongRepository>();
+        for (final id in idsToDelete) {
+          await repo.delete(id);
+        }
+        _selectedIds.clear();
+        AppSnackbar.show('Deleted', '${idsToDelete.length} song(s) removed from library');
+      }
+    } finally {
+      _isDeleting = false;
+    }
   }
 
   Future<void> _deleteSong(Song song) async {

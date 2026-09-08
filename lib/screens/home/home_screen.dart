@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/neumorphic_widget.dart';
 import '../../core/utils.dart';
 import '../../data/models/song.dart';
 import '../../data/repositories/song_repository.dart';
@@ -69,6 +70,20 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ],
                         ),
+                      ),
+                      NeuCircleButton(
+                        size: 40,
+                        onTap: () async {
+                          final svc = Get.find<ImportService>();
+                          final songs = await svc.importSongs(context);
+                          if (songs.isNotEmpty && context.mounted) {
+                            AppSnackbar.show(
+                              '✅ Imported!',
+                              '${songs.length} song(s) added to library',
+                            );
+                          }
+                        },
+                        child: const Icon(Icons.add, color: accentBlue, size: 24),
                       ),
                     ],
                   ),
@@ -214,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen>
                     actionLabel: 'Import a Song',
                     onAction: () async {
                       final svc = Get.find<ImportService>();
-                      await svc.importSingleSong(context);
+                      await svc.importSongs(context);
                     },
                   ),
                 )
@@ -245,7 +260,7 @@ class _SongCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: neuBase,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: neuRaisedShadow,
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,11 +321,14 @@ class _RecentTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isPlaying ? neuInsetShadow : null,
+        border: isPlaying ? null : Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1),
+      ),
+      child: Material(
         color: neuBase,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: isPlaying ? neuInsetShadow : neuSoftShadow,
-      ),
-      child: ListTile(
+        child: ListTile(
         dense: true,
         onTap: onTap,
         leading: Container(
@@ -342,6 +360,7 @@ class _RecentTile extends StatelessWidget {
             style: const TextStyle(fontSize: 11, color: textMid)),
         trailing: Text(song.durationFormatted,
             style: const TextStyle(fontSize: 11, color: textLight)),
+        ),
       ),
     );
   }

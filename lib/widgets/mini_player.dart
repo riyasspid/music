@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../core/theme/app_theme.dart';
 import '../services/audio_provider.dart';
+import '../data/repositories/song_repository.dart';
 import '../screens/player/player_screen.dart';
 
 class MiniPlayer extends StatelessWidget {
@@ -23,7 +24,7 @@ class MiniPlayer extends StatelessWidget {
             transition: Transition.upToDown),
         child: Container(
           height: 70,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
           decoration: BoxDecoration(
             color: neuBase,
             borderRadius: BorderRadius.circular(18),
@@ -82,18 +83,17 @@ class MiniPlayer extends StatelessWidget {
               ),
 
               // Like button
-              Obx(() => IconButton(
-                    icon: Icon(
-                      audio.currentSong.value?.isLiked == true
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                      color: audio.currentSong.value?.isLiked == true
-                          ? likeRed
-                          : textMid,
-                      size: 20,
-                    ),
-                    onPressed: () => audio.toggleLike(song),
-                  )),
+              Obx(() {
+                final isLiked = Get.find<SongRepository>().isLiked(song.id);
+                return IconButton(
+                  icon: Icon(
+                    isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: isLiked ? likeRed : textMid,
+                    size: 20,
+                  ),
+                  onPressed: () => audio.toggleLike(song),
+                );
+              }),
 
               // Play/Pause
               Obx(() => _ControlButton(

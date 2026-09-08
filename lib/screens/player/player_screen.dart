@@ -165,15 +165,13 @@ class PlayerScreen extends StatelessWidget {
                     Obx(() {
                       final isLiked =
                           Get.find<SongRepository>().isLiked(song.id);
-                      return GestureDetector(
+                      return NeuCircleButton(
                         onTap: () => audio.toggleLike(song),
-                        child: NeuCircleButton(
-                          size: 44,
-                          child: Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? likeRed : textMid,
-                            size: 22,
-                          ),
+                        size: 44,
+                        child: Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: isLiked ? likeRed : textMid,
+                          size: 22,
                         ),
                       );
                     }),

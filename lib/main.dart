@@ -10,34 +10,53 @@ import 'data/hive_init.dart';
 import 'services/audio_handler.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    // Lock to portrait
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  // Status bar style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ),
-  );
+    // Status bar style
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
 
-  // Initialize Hive
-  await HiveInit.init();
+    // Initialize Hive
+    await HiveInit.init();
 
-  // Initialize AudioService + handler (background audio)
-  final audioHandler = await AudioService.init(
-    builder: () => MusicAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.music.app.channel',
-      androidNotificationChannelName: 'Music',
-      androidStopForegroundOnPause: true,
-    ),
-  );
+    // Initialize AudioService + handler (background audio)
+    final audioHandler = await AudioService.init(
+      builder: () => MusicAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.music.app.channel',
+        androidNotificationChannelName: 'Music',
+        androidStopForegroundOnPause: true,
+      ),
+    );
 
-  runApp(App(audioHandler: audioHandler));
+    runApp(App(audioHandler: audioHandler));
+  } catch (e, st) {
+    debugPrint('App initialization error: $e\n$st');
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: Text(
+                'Failed to start app:\n$e\n\n$st',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
 }

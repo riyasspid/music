@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../core/theme/app_theme.dart';
 import '../services/audio_provider.dart';
+import '../data/repositories/song_repository.dart';
 import 'song_tile.dart';
 import 'empty_state.dart';
 
@@ -83,14 +84,19 @@ class QueueSheet extends StatelessWidget {
               return ListView.builder(
                 padding: const EdgeInsets.only(bottom: 24),
                 itemCount: q.length,
-                itemBuilder: (_, i) => Obx(() => SongTile(
-                      song: q[i],
-                      isPlaying: audio.currentIndex.value == i,
-                      onTap: () async {
-                        await audio.skipToIndex(i);
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                    )),
+                itemBuilder: (_, i) {
+                  final song = q[i];
+                  return Obx(() => SongTile(
+                        song: song,
+                        isLiked: Get.find<SongRepository>().isLiked(song.id),
+                        isPlaying: audio.currentIndex.value == i,
+                        onLike: () => audio.toggleLike(song),
+                        onTap: () async {
+                          await audio.skipToIndex(i);
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                      ));
+                },
               );
             }),
           ),

@@ -14,7 +14,10 @@ class SongTile extends StatelessWidget {
   final VoidCallback? onDelete;
   final bool? isLiked;
   final VoidCallback? onAddToQueue;
+  final VoidCallback? onAddToPlaylist;
   final bool showPlayCount;
+  final bool isSelected;
+  final VoidCallback? onLongPress;
 
   const SongTile({
     super.key,
@@ -22,10 +25,13 @@ class SongTile extends StatelessWidget {
     this.isPlaying = false,
     this.isLiked,
     this.onTap,
+    this.onLongPress,
     this.onLike,
     this.onDelete,
     this.onAddToQueue,
+    this.onAddToPlaylist,
     this.showPlayCount = false,
+    this.isSelected = false,
   });
 
   @override
@@ -33,13 +39,27 @@ class SongTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       decoration: BoxDecoration(
-        color: neuBase,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: isPlaying ? neuInsetShadow : neuRaisedShadow,
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: accentBlue.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : (isPlaying ? neuInsetShadow : null),
+        border: (isSelected || isPlaying)
+            ? null
+            : Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1),
       ),
-      child: ListTile(
+      child: Material(
+        color: isSelected ? accentBlue.withValues(alpha: 0.1) : neuBase,
+        borderRadius: BorderRadius.circular(14),
+        child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         onTap: onTap,
+        onLongPress: onLongPress,
         leading: _CoverArt(coverPath: song.coverPath, isPlaying: isPlaying),
         title: Text(
           song.title,
@@ -105,6 +125,7 @@ class SongTile extends StatelessWidget {
               ),
               onSelected: (value) {
                 if (value == 'queue') onAddToQueue?.call();
+                if (value == 'playlist') onAddToPlaylist?.call();
                 if (value == 'delete') onDelete?.call();
                 if (value == 'like') onLike?.call();
               },
@@ -112,6 +133,10 @@ class SongTile extends StatelessWidget {
                 const PopupMenuItem(
                   value: 'queue',
                   child: Text('Add to Queue'),
+                ),
+                const PopupMenuItem(
+                  value: 'playlist',
+                  child: Text('Add to Playlist'),
                 ),
                 PopupMenuItem(
                   value: 'like',
@@ -124,6 +149,7 @@ class SongTile extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

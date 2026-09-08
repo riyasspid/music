@@ -172,10 +172,6 @@ class AudioProvider extends GetxController {
 
   Future<void> toggleLike(Song song) async {
     await _songRepo.toggleLike(song.id);
-    if (currentSong.value?.id == song.id) {
-      currentSong.value = _songRepo.getById(song.id);
-      currentSong.refresh();
-    }
   }
 
   Future<void> stop() => _handler.stop();

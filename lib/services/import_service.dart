@@ -26,133 +26,115 @@ class ImportService {
   /// Pick a single audio file, extract embedded metadata & cover art,
   /// show metadata dialog with cover preview & picker, then save to library.
   /// Returns the saved Song or null if cancelled.
-  Future<Song?> importSingleSong(BuildContext context) async {
-    if (_isImporting) return null;
+  Future<List<Song>> importSongs(BuildContext context) async {
+    if (_isImporting) return [];
     _isImporting = true;
     try {
-      // 1. File picker for audio
+      // 1. File picker for audio (allow multiple)
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: AppConstants.allowedExtensions,
+        allowMultiple: true,
       );
-      if (result == null || result.files.isEmpty) return null;
+      if (result == null || result.files.isEmpty) return [];
 
-      final pickedFile = result.files.first;
-      final sourcePath = pickedFile.path;
-      if (sourcePath == null) return null;
+      List<Song> importedSongs = [];
 
-    // 2. Get duration from audio file
-    final tempPlayer = AudioPlayer();
-    int songSeconds = 0;
-    try {
-      await tempPlayer.setFilePath(sourcePath);
-      final dur = tempPlayer.duration;
-      songSeconds = dur?.inSeconds ?? 0;
-    } catch (_) {
-      songSeconds = 0;
-    } finally {
-      await tempPlayer.dispose();
-    }
+      for (var pickedFile in result.files) {
+        final sourcePath = pickedFile.path;
+        if (sourcePath == null) continue;
 
-    // 3. Extract embedded audio metadata & cover art from file
-    String defaultTitle = AppUtils.fileNameToTitle(sourcePath);
-    String defaultAuthor = '';
-    String? extractedCoverPath;
-
-    try {
-      final audioMeta = readMetadata(File(sourcePath), getImage: true);
-      if (audioMeta.title != null && audioMeta.title!.trim().isNotEmpty) {
-        defaultTitle = audioMeta.title!.trim();
-      }
-      if (audioMeta.artist != null && audioMeta.artist!.trim().isNotEmpty) {
-        defaultAuthor = audioMeta.artist!.trim();
-      }
-      if (audioMeta.pictures.isNotEmpty) {
-        final pic = audioMeta.pictures.first;
-        if (pic.bytes.isNotEmpty) {
-          final tempDir = await getTemporaryDirectory();
-          String ext = '.jpg';
-          if (pic.bytes.length >= 4 &&
-              pic.bytes[0] == 0x89 &&
-              pic.bytes[1] == 0x50 &&
-              pic.bytes[2] == 0x4E &&
-              pic.bytes[3] == 0x47) {
-            ext = '.png';
-          }
-          final tempFile = File(p.join(
-            tempDir.path,
-            'extracted_cover_${DateTime.now().millisecondsSinceEpoch}$ext',
-          ));
-          await tempFile.writeAsBytes(pic.bytes);
-          extractedCoverPath = tempFile.path;
+        // 2. Get duration from audio file
+        final tempPlayer = AudioPlayer();
+        int songSeconds = 0;
+        try {
+          await tempPlayer.setFilePath(sourcePath);
+          final dur = tempPlayer.duration;
+          songSeconds = dur?.inSeconds ?? 0;
+        } catch (_) {
+          songSeconds = 0;
+        } finally {
+          await tempPlayer.dispose();
         }
-      }
-    } catch (e) {
-      debugPrint('Could not read embedded audio metadata: $e');
-    }
 
-    // 4. Show metadata dialog with cover preview and picker (guard context after async gap)
-    if (!context.mounted) return null;
-    final metadata = await _showMetadataDialog(
-      context: context,
-      defaultTitle: defaultTitle,
-      defaultAuthor: defaultAuthor,
-      initialCoverPath: extractedCoverPath,
-    );
+        // 3. Extract embedded audio metadata & cover art from file
+        String defaultTitle = AppUtils.fileNameToTitle(sourcePath);
+        String defaultAuthor = 'Unknown Artist';
+        String? extractedCoverPath;
 
-    if (metadata == null) {
-      // User cancelled: clean up temporary extracted cover if created
-      if (extractedCoverPath != null) {
         try {
-          final f = File(extractedCoverPath);
-          if (f.existsSync()) f.deleteSync();
-        } catch (_) {}
+          final audioMeta = readMetadata(File(sourcePath), getImage: true);
+          if (audioMeta.title != null && audioMeta.title!.trim().isNotEmpty) {
+            defaultTitle = audioMeta.title!.trim();
+          }
+          if (audioMeta.artist != null && audioMeta.artist!.trim().isNotEmpty) {
+            defaultAuthor = audioMeta.artist!.trim();
+          }
+          if (audioMeta.pictures.isNotEmpty) {
+            final pic = audioMeta.pictures.first;
+            if (pic.bytes.isNotEmpty) {
+              final tempDir = await getTemporaryDirectory();
+              String ext = '.jpg';
+              if (pic.bytes.length >= 4 &&
+                  pic.bytes[0] == 0x89 &&
+                  pic.bytes[1] == 0x50 &&
+                  pic.bytes[2] == 0x4E &&
+                  pic.bytes[3] == 0x47) {
+                ext = '.png';
+              }
+              final tempFile = File(p.join(
+                tempDir.path,
+                'extracted_cover_${DateTime.now().millisecondsSinceEpoch}_${_uuid.v4()}$ext',
+              ));
+              await tempFile.writeAsBytes(pic.bytes);
+              extractedCoverPath = tempFile.path;
+            }
+          }
+        } catch (e) {
+          debugPrint('Could not read embedded audio metadata: $e');
+        }
+
+        // 4. Copy song file to internal storage
+        final appDir = await getApplicationDocumentsDirectory();
+        final songsDir = Directory(p.join(appDir.path, 'songs'));
+        if (!songsDir.existsSync()) songsDir.createSync(recursive: true);
+
+        final songId = _uuid.v4();
+        final ext = p.extension(sourcePath);
+        final destPath = p.join(songsDir.path, '$songId$ext');
+        await File(sourcePath).copy(destPath);
+
+        // 5. Move extracted cover to covers directory
+        String? coverDestPath;
+        if (extractedCoverPath != null && File(extractedCoverPath).existsSync()) {
+          final coversDir = Directory(p.join(appDir.path, 'covers'));
+          if (!coversDir.existsSync()) coversDir.createSync(recursive: true);
+          final coverExt = p.extension(extractedCoverPath).isNotEmpty
+              ? p.extension(extractedCoverPath)
+              : '.jpg';
+          coverDestPath = p.join(coversDir.path, '$songId$coverExt');
+          await File(extractedCoverPath).copy(coverDestPath);
+
+          // Clean up temp extracted file
+          try {
+            File(extractedCoverPath).deleteSync();
+          } catch (_) {}
+        }
+
+        // 6. Save to Hive
+        final song = Song(
+          id: songId,
+          title: defaultTitle,
+          author: defaultAuthor,
+          seconds: songSeconds,
+          filePath: destPath,
+          coverPath: coverDestPath,
+          addedAt: DateTime.now(),
+        );
+        await _repo.save(song);
+        importedSongs.add(song);
       }
-      return null;
-    }
-
-    // 5. Copy song file to internal storage
-    final appDir = await getApplicationDocumentsDirectory();
-    final songsDir = Directory(p.join(appDir.path, 'songs'));
-    if (!songsDir.existsSync()) songsDir.createSync(recursive: true);
-
-    final songId = _uuid.v4();
-    final ext = p.extension(sourcePath);
-    final destPath = p.join(songsDir.path, '$songId$ext');
-    await File(sourcePath).copy(destPath);
-
-    // 6. Copy cover if selected or extracted
-    String? coverDestPath;
-    final chosenCover = metadata['coverPath'] as String?;
-    if (chosenCover != null && File(chosenCover).existsSync()) {
-      final coversDir = Directory(p.join(appDir.path, 'covers'));
-      if (!coversDir.existsSync()) coversDir.createSync(recursive: true);
-      final coverExt = p.extension(chosenCover).isNotEmpty
-          ? p.extension(chosenCover)
-          : '.jpg';
-      coverDestPath = p.join(coversDir.path, '$songId$coverExt');
-      await File(chosenCover).copy(coverDestPath);
-
-      // Clean up temp extracted file if it was used
-      if (extractedCoverPath != null && extractedCoverPath == chosenCover) {
-        try {
-          File(extractedCoverPath).deleteSync();
-        } catch (_) {}
-      }
-    }
-
-    // 7. Save to Hive
-    final song = Song(
-      id: songId,
-      title: metadata['title'] as String,
-      author: metadata['author'] as String,
-      seconds: songSeconds,
-      filePath: destPath,
-      coverPath: coverDestPath,
-      addedAt: DateTime.now(),
-    );
-    await _repo.save(song);
-    return song;
+      return importedSongs;
     } finally {
       _isImporting = false;
     }

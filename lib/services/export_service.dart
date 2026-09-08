@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive_io.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../core/constants.dart';
@@ -18,7 +19,7 @@ class ExportService {
 
   /// Creates a ZIP file in Downloads containing all songs + metadata.
   /// Returns the path to the created ZIP, or null on failure.
-  Future<String?> exportAll() async {
+  Future<String?> exportAll({void Function(double)? onProgress}) async {
     if (_isExporting) return null;
     _isExporting = true;
     try {
@@ -27,14 +28,17 @@ class ExportService {
 
       final encoder = ZipFileEncoder();
 
-      // Write to external Downloads directory
-      final downloadsDir = await _getDownloadsDir();
+      // Write to temp path
+      final tempDir = await getTemporaryDirectory();
       final now = DateTime.now();
       final fileName =
           'music_${now.year}${_pad(now.month)}${_pad(now.day)}.zip';
-      final zipPath = p.join(downloadsDir.path, fileName);
-
+          
+      final zipPath = p.join(tempDir.path, fileName);
       encoder.create(zipPath);
+
+      int totalItems = 1 + songs.length * 2; // metadata + songs + covers
+      int completedItems = 0;
 
       // metadata.json
       final metadata = songs.map((s) => _songToExportJson(s)).toList();
@@ -42,6 +46,9 @@ class ExportService {
       encoder.addArchiveFile(
         ArchiveFile(AppConstants.metadataFileName, metaBytes.length, metaBytes),
       );
+      completedItems++;
+      onProgress?.call(completedItems / totalItems);
+      await Future.delayed(const Duration(milliseconds: 10));
 
       // Song files
       for (final song in songs) {
@@ -50,6 +57,9 @@ class ExportService {
           final ext = p.extension(song.filePath);
           encoder.addFile(file, '${AppConstants.songsFolder}/${song.id}$ext');
         }
+        completedItems++;
+        onProgress?.call(completedItems / totalItems);
+        await Future.delayed(const Duration(milliseconds: 10));
       }
 
       // Cover art files
@@ -62,6 +72,9 @@ class ExportService {
                 coverFile, '${AppConstants.coversFolder}/${song.id}$ext');
           }
         }
+        completedItems++;
+        onProgress?.call(completedItems / totalItems);
+        await Future.delayed(const Duration(milliseconds: 10));
       }
 
       encoder.close();

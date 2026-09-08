@@ -148,6 +148,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                         final song = songs[i];
                         return Obx(() => SongTile(
                               song: song,
+                              isLiked: Get.find<SongRepository>().isLiked(song.id),
                               isPlaying:
                                   audio.currentSong.value?.id == song.id,
                               onTap: () =>

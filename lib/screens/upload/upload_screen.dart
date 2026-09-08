@@ -44,15 +44,15 @@ class UploadScreen extends StatelessWidget {
               // ── Import single song ────────────────────────────────────────
               _ImportCard(
                 icon: Icons.audio_file,
-                title: 'Import Song',
-                subtitle: 'Pick an audio file (MP3, FLAC, WAV, M4A…)',
+                title: 'Import Song(s)',
+                subtitle: 'Pick audio files (MP3, FLAC, WAV, M4A…)',
                 color: accentBlue,
                 onTap: () async {
-                  final song = await importSvc.importSingleSong(context);
-                  if (song != null && context.mounted) {
+                  final songs = await importSvc.importSongs(context);
+                  if (songs.isNotEmpty && context.mounted) {
                     AppSnackbar.show(
                       '✅ Imported!',
-                      '"${song.title}" by ${song.author} added',
+                      '${songs.length} song(s) added to your library',
                       duration: const Duration(seconds: 3),
                     );
                   }
